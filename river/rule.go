@@ -1,8 +1,6 @@
 package river
 
-import (
-	"github.com/siddontang/go-mysql/schema"
-)
+import "github.com/siddontang/go-mysql/schema"
 
 // If you want to sync MySQL data into elasticsearch, you must set a rule to let use know how to do it.
 // The mapping rule may thi: schema + table <-> index + document type.
@@ -13,6 +11,12 @@ type Rule struct {
 	Index  string `toml:"index"`
 	Type   string `toml:"type"`
 	Parent string `toml:"parent"`
+
+	NestedProperty         string `toml:"nested_property"`
+	NestedParentKeyColumns string `toml:"nested_parent_key_columns"`
+	NestedInsertScript     string `toml:"nested_insert_script"`
+	NestedUpdateScript     string `toml:"nested_update_script"`
+	NestedDeleteScript     string `toml:"nested_delete_script"`
 
 	// Default, a MySQL table field name is mapped to Elasticsearch field name.
 	// Sometimes, you want to use different name, e.g, the MySQL file name is title,
@@ -48,5 +52,21 @@ func (r *Rule) prepare() error {
 		r.Type = r.Index
 	}
 
+	if len(r.NestedProperty) > 0 {
+		if len(r.NestedInsertScript) == 0 {
+			r.NestedInsertScript = ""
+		}
+		if len(r.NestedUpdateScript) == 0 {
+			r.NestedUpdateScript = ""
+		}
+		if len(r.NestedDeleteScript) == 0 {
+			r.NestedDeleteScript = ""
+		}
+	}
+
 	return nil
+}
+
+func (r *Rule) IsNested() bool {
+	return len(r.NestedProperty) > 0
 }

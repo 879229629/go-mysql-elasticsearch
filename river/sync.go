@@ -82,10 +82,18 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 		req := &elastic.BulkRequest{Index: rule.Index, Type: rule.Type, ID: id, Parent: parentID}
 
 		if action == canal.DeleteAction {
-			req.Action = elastic.ActionDelete
+			if rule.IsNested() {
+				r.makeUpdateReqData(req, rule, rule.NestedDeleteScript, nil, values)
+			} else {
+				req.Action = elastic.ActionDelete
+			}
 			r.st.DeleteNum.Add(1)
 		} else {
-			r.makeInsertReqData(req, rule, values)
+			if rule.IsNested() {
+				r.makeUpdateReqData(req, rule, rule.NestedInsertScript, nil, values)
+			} else {
+				r.makeInsertReqData(req, rule, values)
+			}
 			r.st.InsertNum.Add(1)
 		}
 
@@ -144,7 +152,11 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 			r.st.DeleteNum.Add(1)
 			r.st.InsertNum.Add(1)
 		} else {
-			r.makeUpdateReqData(req, rule, rows[i], rows[i+1])
+			if rule.IsNested() {
+				r.makeUpdateReqData(req, rule, rule.NestedUpdateScript, rows[i], rows[i+1])
+			} else {
+				r.makeUpdateReqData(req, rule, "", rows[i], rows[i+1])
+			}
 			r.st.UpdateNum.Add(1)
 		}
 
@@ -249,16 +261,20 @@ func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values [
 }
 
 func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
-	beforeValues []interface{}, afterValues []interface{}) {
-	req.Data = make(map[string]interface{}, len(beforeValues))
+	script string, beforeValues []interface{}, afterValues []interface{}) {
+
+	// beforeValues could be nil, use afterValues instead
+	values := make(map[string]interface{}, len(afterValues))
 
 	// maybe dangerous if something wrong delete before?
 	req.Action = elastic.ActionUpdate
 
+	partialUpdate := len(beforeValues) > 0 && len(script) == 0
+
 	for i, c := range rule.TableInfo.Columns {
 		mapped := false
-		if reflect.DeepEqual(beforeValues[i], afterValues[i]) {
-			//nothing changed
+		if partialUpdate && reflect.DeepEqual(beforeValues[i], afterValues[i]) {
+			// nothing changed
 			continue
 		}
 		for k, v := range rule.FieldMapping {
@@ -269,35 +285,63 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 				v := r.makeReqColumnData(&c, afterValues[i])
 				str, ok := v.(string)
 				if ok == false {
-					req.Data[c.Name] = v
+					values[c.Name] = v
 				} else {
 					if fieldType == fieldTypeList {
-						req.Data[elastic] = strings.Split(str, ",")
+						values[elastic] = strings.Split(str, ",")
 					} else {
-						req.Data[elastic] = str
+						values[elastic] = str
 					}
 				}
 			}
 		}
 		if mapped == false {
-			req.Data[c.Name] = r.makeReqColumnData(&c, afterValues[i])
+			values[c.Name] = r.makeReqColumnData(&c, afterValues[i])
 		}
+	}
 
+	if len(script) > 0 {
+		req.Data = map[string]interface{}{
+			"script": map[string]interface{}{
+				"inline": script,
+				"params": map[string]interface{}{
+					"object": values,
+				},
+			},
+		}
+	} else {
+		req.Data = map[string]interface{}{
+			"doc": values,
+		}
 	}
 }
 
 // Get primary keys in one row and format them into a string
 // PK must not be nil
 func (r *River) getDocID(rule *Rule, row []interface{}) (string, error) {
-	pks, err := canal.GetPKValues(rule.TableInfo, row)
-	if err != nil {
-		return "", err
+	var keys []interface{}
+	if rule.IsNested() {
+		columns := strings.Split(rule.NestedParentKeyColumns, ",")
+		keys = make([]interface{}, len(columns))
+		for i, column := range columns {
+			if pos := rule.TableInfo.FindColumn(column); pos >= 0 {
+				keys[i] = row[pos]
+			} else {
+				return "", errors.Errorf("Could not find parent key column '%s' in nested object '%s'", column, rule.NestedProperty)
+			}
+		}
+	} else {
+		var err error
+		keys, err = canal.GetPKValues(rule.TableInfo, row)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	var buf bytes.Buffer
 
 	sep := ""
-	for i, value := range pks {
+	for i, value := range keys {
 		if value == nil {
 			return "", errors.Errorf("The %ds PK value is nil", i)
 		}

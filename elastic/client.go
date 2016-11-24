@@ -90,17 +90,6 @@ func (r *BulkRequest) bulk(buf *bytes.Buffer) error {
 	switch r.Action {
 	case ActionDelete:
 		//nothing to do
-	case ActionUpdate:
-		doc := map[string]interface{}{
-			"doc": r.Data,
-		}
-		data, err = json.Marshal(doc)
-		if err != nil {
-			return errors.Trace(err)
-		}
-
-		buf.Write(data)
-		buf.WriteByte('\n')
 	default:
 		//for create and index
 		data, err = json.Marshal(r.Data)
@@ -124,13 +113,13 @@ type BulkResponse struct {
 }
 
 type BulkResponseItem struct {
-	Index   string `json:"_index"`
-	Type    string `json:"_type"`
-	ID      string `json:"_id"`
-	Version int    `json:"_version"`
-	Status  int    `json:"status"`
+	Index   string          `json:"_index"`
+	Type    string          `json:"_type"`
+	ID      string          `json:"_id"`
+	Version int             `json:"_version"`
+	Status  int             `json:"status"`
 	Error   json.RawMessage `json:"error"`
-	Found   bool   `json:"found"`
+	Found   bool            `json:"found"`
 }
 
 func (c *Client) Do(method string, url string, body map[string]interface{}) (*Response, error) {

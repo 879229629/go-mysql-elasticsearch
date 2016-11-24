@@ -224,7 +224,7 @@ func (r *River) prepareRule() error {
 
 		// table must have a PK for one column, multi columns may be supported later.
 
-		if len(rule.TableInfo.PKColumns) != 1 {
+		if !rule.IsNested() && len(rule.TableInfo.PKColumns) != 1 {
 			return errors.Errorf("%s.%s must have a PK for a column", rule.Schema, rule.Table)
 		}
 	}
