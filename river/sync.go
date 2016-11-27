@@ -2,6 +2,7 @@ package river
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -36,14 +37,13 @@ func (h *rowsEventHandler) Do(e *canal.RowsEvent) error {
 	var reqs []*elastic.BulkRequest
 	var err error
 	for _, rule := range rules {
-		var r []*elastic.BulkRequest
 		switch e.Action {
 		case canal.InsertAction:
-			r, err = h.r.makeInsertRequest(rule, e.Rows)
+			reqs, err = h.r.makeInsertRequest(rule, e.Rows)
 		case canal.DeleteAction:
-			r, err = h.r.makeDeleteRequest(rule, e.Rows)
+			reqs, err = h.r.makeDeleteRequest(rule, e.Rows)
 		case canal.UpdateAction:
-			r, err = h.r.makeUpdateRequest(rule, e.Rows)
+			reqs, err = h.r.makeUpdateRequest(rule, e.Rows)
 		default:
 			return errors.Errorf("invalid rows action %s", e.Action)
 		}
@@ -52,12 +52,10 @@ func (h *rowsEventHandler) Do(e *canal.RowsEvent) error {
 			return errors.Errorf("make %s ES request err %v", e.Action, err)
 		}
 
-		reqs = append(reqs, r...)
-	}
-
-	if err := h.r.doBulk(reqs); err != nil {
-		log.Errorf("do ES bulks err %v, stop", err)
-		return canal.ErrHandleInterrupted
+		if err := h.r.doBulk(rule, reqs); err != nil {
+			log.Errorf("do ES bulks err %v, stop", err)
+			return canal.ErrHandleInterrupted
+		}
 	}
 
 	return nil
@@ -380,7 +378,7 @@ func (r *River) getParentID(rule *Rule, row []interface{}, columnName string) (s
 	return fmt.Sprint(row[index]), nil
 }
 
-func (r *River) doBulk(reqs []*elastic.BulkRequest) error {
+func (r *River) doBulk(rule *Rule, reqs []*elastic.BulkRequest) error {
 	if len(reqs) == 0 {
 		return nil
 	}
@@ -392,8 +390,18 @@ func (r *River) doBulk(reqs []*elastic.BulkRequest) error {
 		for i := 0; i < len(resp.Items); i++ {
 			for action, item := range resp.Items[i] {
 				if len(item.Error) > 0 {
-					log.Errorf("%s index: %s, type: %s, id: %s, status: %d, error: %s",
-						action, item.Index, item.Type, item.ID, item.Status, item.Error)
+					ignoreError := false
+					if rule.IgnoreDocumentMissingError {
+						var msg map[string]string
+						_ = json.Unmarshal(item.Error, &msg)
+						if msg["type"] == "document_missing_exception" {
+							ignoreError = true
+						}
+					}
+					if !ignoreError {
+						log.Errorf("%s index: %s, type: %s, id: %s, status: %d, error: %s",
+							action, item.Index, item.Type, item.ID, item.Status, item.Error)
+					}
 				}
 			}
 		}
