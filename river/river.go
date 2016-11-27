@@ -20,7 +20,7 @@ type River struct {
 
 	canal *canal.Canal
 
-	rules map[string]*Rule
+	rules map[string][]*Rule
 
 	quit chan struct{}
 	wg   sync.WaitGroup
@@ -37,7 +37,7 @@ func NewRiver(c *Config) (*River, error) {
 
 	r.quit = make(chan struct{})
 
-	r.rules = make(map[string]*Rule)
+	r.rules = make(map[string][]*Rule)
 
 	var err error
 	if err = r.newCanal(); err != nil {
@@ -86,7 +86,8 @@ func (r *River) prepareCanal() error {
 	var db string
 	dbs := map[string]struct{}{}
 	tables := make([]string, 0, len(r.rules))
-	for _, rule := range r.rules {
+	for _, array := range r.rules {
+		rule := array[0]
 		db = rule.Schema
 		dbs[rule.Schema] = struct{}{}
 		tables = append(tables, rule.Table)
@@ -112,12 +113,8 @@ func (r *River) prepareCanal() error {
 
 func (r *River) newRule(schema, table string) error {
 	key := ruleKey(schema, table)
-
-	if _, ok := r.rules[key]; ok {
-		return errors.Errorf("duplicate source %s, %s defined in config", schema, table)
-	}
-
-	r.rules[key] = newDefaultRule(schema, table)
+	rule := newDefaultRule(schema, table)
+	r.rules[key] = append(r.rules[key], rule)
 	return nil
 }
 
@@ -200,11 +197,12 @@ func (r *River) prepareRule() error {
 				rule.prepare()
 
 				for _, table := range tables {
-					rr := r.rules[ruleKey(rule.Schema, table)]
-					rr.Index = rule.Index
-					rr.Type = rule.Type
-					rr.Parent = rule.Parent
-					rr.FieldMapping = rule.FieldMapping
+					for _, rr := range r.rules[ruleKey(rule.Schema, table)] {
+						rr.Index = rule.Index
+						rr.Type = rule.Type
+						rr.Parent = rule.Parent
+						rr.FieldMapping = rule.FieldMapping
+					}
 				}
 			} else {
 				key := ruleKey(rule.Schema, rule.Table)
@@ -212,20 +210,26 @@ func (r *River) prepareRule() error {
 					return errors.Errorf("rule %s, %s not defined in source", rule.Schema, rule.Table)
 				}
 				rule.prepare()
-				r.rules[key] = rule
+				r.rules[key] = append(r.rules[key], rule)
 			}
 		}
 	}
 
-	for _, rule := range r.rules {
-		if rule.TableInfo, err = r.canal.GetTable(rule.Schema, rule.Table); err != nil {
-			return errors.Trace(err)
+	for key, array := range r.rules {
+		if len(array) > 1 {
+			// custom mapping rule defined, remove default rule appended in parseSource()
+			array = array[1:]
+			r.rules[key] = array
 		}
+		for _, rule := range array {
+			if rule.TableInfo, err = r.canal.GetTable(rule.Schema, rule.Table); err != nil {
+				return errors.Trace(err)
+			}
 
-		// table must have a PK for one column, multi columns may be supported later.
-
-		if !rule.IsNested() && len(rule.TableInfo.PKColumns) != 1 {
-			return errors.Errorf("%s.%s must have a PK for a column", rule.Schema, rule.Table)
+			// table must have a PK for one column, multi columns may be supported later.
+			if len(rule.IDColumns) == 0 && len(rule.TableInfo.PKColumns) != 1 {
+				return errors.Errorf("%s.%s must have a PK for a column", rule.Schema, rule.Table)
+			}
 		}
 	}
 

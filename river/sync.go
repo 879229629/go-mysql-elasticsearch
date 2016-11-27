@@ -28,26 +28,31 @@ type rowsEventHandler struct {
 }
 
 func (h *rowsEventHandler) Do(e *canal.RowsEvent) error {
-	rule, ok := h.r.rules[ruleKey(e.Table.Schema, e.Table.Name)]
+	rules, ok := h.r.rules[ruleKey(e.Table.Schema, e.Table.Name)]
 	if !ok {
 		return nil
 	}
 
 	var reqs []*elastic.BulkRequest
 	var err error
-	switch e.Action {
-	case canal.InsertAction:
-		reqs, err = h.r.makeInsertRequest(rule, e.Rows)
-	case canal.DeleteAction:
-		reqs, err = h.r.makeDeleteRequest(rule, e.Rows)
-	case canal.UpdateAction:
-		reqs, err = h.r.makeUpdateRequest(rule, e.Rows)
-	default:
-		return errors.Errorf("invalid rows action %s", e.Action)
-	}
+	for _, rule := range rules {
+		var r []*elastic.BulkRequest
+		switch e.Action {
+		case canal.InsertAction:
+			r, err = h.r.makeInsertRequest(rule, e.Rows)
+		case canal.DeleteAction:
+			r, err = h.r.makeDeleteRequest(rule, e.Rows)
+		case canal.UpdateAction:
+			r, err = h.r.makeUpdateRequest(rule, e.Rows)
+		default:
+			return errors.Errorf("invalid rows action %s", e.Action)
+		}
 
-	if err != nil {
-		return errors.Errorf("make %s ES request err %v", e.Action, err)
+		if err != nil {
+			return errors.Errorf("make %s ES request err %v", e.Action, err)
+		}
+
+		reqs = append(reqs, r...)
 	}
 
 	if err := h.r.doBulk(reqs); err != nil {
@@ -81,20 +86,26 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 
 		req := &elastic.BulkRequest{Index: rule.Index, Type: rule.Type, ID: id, Parent: parentID}
 
+		var script string
 		if action == canal.DeleteAction {
-			if rule.IsNested() {
-				r.makeUpdateReqData(req, rule, rule.NestedDeleteScript, nil, values)
-			} else {
-				req.Action = elastic.ActionDelete
-			}
-			r.st.DeleteNum.Add(1)
+			req.Action = rule.DeleteAction
+			script = rule.DeleteScript
 		} else {
-			if rule.IsNested() {
-				r.makeUpdateReqData(req, rule, rule.NestedInsertScript, nil, values)
-			} else {
-				r.makeInsertReqData(req, rule, values)
-			}
+			req.Action = rule.InsertAction
+			script = rule.InsertScript
+		}
+
+		switch req.Action {
+		case elastic.ActionIndex:
+			r.makeInsertReqData(req, rule, values)
 			r.st.InsertNum.Add(1)
+		case elastic.ActionUpdate:
+			r.makeUpdateReqData(req, rule, script, nil, values)
+			r.st.UpdateNum.Add(1)
+		case elastic.ActionDelete:
+			r.st.DeleteNum.Add(1)
+		default:
+			return nil, errors.New(fmt.Sprintf("Elastic bulk action '%s' is not supported", req.Action))
 		}
 
 		reqs = append(reqs, req)
@@ -152,12 +163,19 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 			r.st.DeleteNum.Add(1)
 			r.st.InsertNum.Add(1)
 		} else {
-			if rule.IsNested() {
-				r.makeUpdateReqData(req, rule, rule.NestedUpdateScript, rows[i], rows[i+1])
-			} else {
-				r.makeUpdateReqData(req, rule, "", rows[i], rows[i+1])
+			req.Action = rule.UpdateAction
+			switch req.Action {
+			case elastic.ActionIndex:
+				r.makeInsertReqData(req, rule, rows[i+1])
+				r.st.InsertNum.Add(1)
+			case elastic.ActionUpdate:
+				r.makeUpdateReqData(req, rule, rule.UpdateScript, rows[i], rows[i+1])
+				r.st.UpdateNum.Add(1)
+			case elastic.ActionDelete:
+				r.st.DeleteNum.Add(1)
+			default:
+				return nil, errors.New(fmt.Sprintf("Elastic bulk action '%s' is not supported", req.Action))
 			}
-			r.st.UpdateNum.Add(1)
 		}
 
 		reqs = append(reqs, req)
@@ -320,14 +338,14 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 // PK must not be nil
 func (r *River) getDocID(rule *Rule, row []interface{}) (string, error) {
 	var keys []interface{}
-	if rule.IsNested() {
-		columns := strings.Split(rule.NestedParentKeyColumns, ",")
+	if len(rule.IDColumns) > 0 {
+		columns := strings.Split(rule.IDColumns, ",")
 		keys = make([]interface{}, len(columns))
 		for i, column := range columns {
 			if pos := rule.TableInfo.FindColumn(column); pos >= 0 {
 				keys[i] = row[pos]
 			} else {
-				return "", errors.Errorf("Could not find parent key column '%s' in nested object '%s'", column, rule.NestedProperty)
+				return "", errors.Errorf("Could not find id column '%s' in table '%s'", column, rule.Table)
 			}
 		}
 	} else {
