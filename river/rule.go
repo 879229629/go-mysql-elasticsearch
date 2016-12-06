@@ -1,7 +1,8 @@
 package river
 
 import (
-	"github.com/siddontang/go-mysql-elasticsearch/elastic"
+	"github.com/pantalo/go-mysql-elasticsearch/elastic"
+	"github.com/siddontang/go-mysql/canal"
 	"github.com/siddontang/go-mysql/schema"
 )
 
@@ -15,13 +16,7 @@ type Rule struct {
 	Type   string `toml:"type"`
 	Parent string `toml:"parent"`
 
-	IDColumns    string `toml:"id_columns"`
-	InsertAction string `toml:"insert_action"`
-	InsertScript string `toml:"insert_script"`
-	UpdateAction string `toml:"update_action"`
-	UpdateScript string `toml:"update_script"`
-	DeleteAction string `toml:"delete_action"`
-	DeleteScript string `toml:"delete_script"`
+	IDColumns string `toml:"id_columns"`
 
 	IgnoreDocumentMissingError bool `toml:"ignore_document_missing_error"`
 
@@ -32,6 +27,17 @@ type Rule struct {
 
 	// MySQL table information
 	TableInfo *schema.Table
+
+	CustomActionMapping []*ActionMapping `toml:"action"`
+
+	ActionMapping map[string]*ActionMapping
+}
+
+type ActionMapping struct {
+	DBAction       string `toml:"db_action"`
+	ESAction       string `toml:"es_action"`
+	Script         string `toml:"script"`
+	ScriptedUpsert bool   `toml:"scripted_upsert"`
 }
 
 func newDefaultRule(schema string, table string) *Rule {
@@ -42,6 +48,7 @@ func newDefaultRule(schema string, table string) *Rule {
 	r.Index = table
 	r.Type = table
 	r.FieldMapping = make(map[string]string)
+	r.ActionMapping = make(map[string]*ActionMapping)
 
 	return r
 }
@@ -59,16 +66,33 @@ func (r *Rule) prepare() error {
 		r.Type = r.Index
 	}
 
-	if len(r.InsertAction) == 0 {
-		r.InsertAction = elastic.ActionIndex
+	if r.ActionMapping == nil {
+		r.ActionMapping = make(map[string]*ActionMapping)
 	}
 
-	if len(r.UpdateAction) == 0 {
-		r.UpdateAction = elastic.ActionUpdate
+	for _, mapping := range r.CustomActionMapping {
+		r.ActionMapping[mapping.DBAction] = mapping
 	}
 
-	if len(r.DeleteAction) == 0 {
-		r.DeleteAction = elastic.ActionDelete
+	if _, ok := r.ActionMapping[canal.InsertAction]; !ok {
+		r.ActionMapping[canal.InsertAction] = &ActionMapping{
+			DBAction: canal.InsertAction,
+			ESAction: elastic.ActionIndex,
+		}
+	}
+
+	if _, ok := r.ActionMapping[canal.UpdateAction]; !ok {
+		r.ActionMapping[canal.UpdateAction] = &ActionMapping{
+			DBAction: canal.UpdateAction,
+			ESAction: elastic.ActionUpdate,
+		}
+	}
+
+	if _, ok := r.ActionMapping[canal.DeleteAction]; !ok {
+		r.ActionMapping[canal.DeleteAction] = &ActionMapping{
+			DBAction: canal.DeleteAction,
+			ESAction: elastic.ActionDelete,
+		}
 	}
 
 	return nil

@@ -52,6 +52,10 @@ func (h *rowsEventHandler) Do(e *canal.RowsEvent) error {
 			return errors.Errorf("make %s ES request err %v", e.Action, err)
 		}
 
+		if len(reqs) == 0 {
+			continue
+		}
+
 		if err := h.r.doBulk(rule, reqs); err != nil {
 			log.Errorf("do ES bulks err %v, stop", err)
 			return canal.ErrHandleInterrupted
@@ -74,6 +78,9 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 		if err != nil {
 			return nil, errors.Trace(err)
 		}
+		if len(id) == 0 {
+			continue
+		}
 
 		parentID := ""
 		if len(rule.Parent) > 0 {
@@ -82,23 +89,16 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 			}
 		}
 
+		mapping := rule.ActionMapping[action]
 		req := &elastic.BulkRequest{Index: rule.Index, Type: rule.Type, ID: id, Parent: parentID}
-
-		var script string
-		if action == canal.DeleteAction {
-			req.Action = rule.DeleteAction
-			script = rule.DeleteScript
-		} else {
-			req.Action = rule.InsertAction
-			script = rule.InsertScript
-		}
+		req.Action = mapping.ESAction
 
 		switch req.Action {
 		case elastic.ActionIndex:
 			r.makeInsertReqData(req, rule, values)
 			r.st.InsertNum.Add(1)
 		case elastic.ActionUpdate:
-			r.makeUpdateReqData(req, rule, script, nil, values)
+			r.makeUpdateReqData(req, rule, mapping.Script, mapping.ScriptedUpsert, nil, values)
 			r.st.UpdateNum.Add(1)
 		case elastic.ActionDelete:
 			r.st.DeleteNum.Add(1)
@@ -132,11 +132,17 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 		if err != nil {
 			return nil, errors.Trace(err)
 		}
+		if len(beforeID) == 0 {
+			continue
+		}
 
 		afterID, err := r.getDocID(rule, rows[i+1])
 
 		if err != nil {
 			return nil, errors.Trace(err)
+		}
+		if len(afterID) == 0 {
+			continue
 		}
 
 		beforeParentID, afterParentID := "", ""
@@ -161,13 +167,14 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 			r.st.DeleteNum.Add(1)
 			r.st.InsertNum.Add(1)
 		} else {
-			req.Action = rule.UpdateAction
+			mapping := rule.ActionMapping[canal.UpdateAction]
+			req.Action = mapping.ESAction
 			switch req.Action {
 			case elastic.ActionIndex:
 				r.makeInsertReqData(req, rule, rows[i+1])
 				r.st.InsertNum.Add(1)
 			case elastic.ActionUpdate:
-				r.makeUpdateReqData(req, rule, rule.UpdateScript, rows[i], rows[i+1])
+				r.makeUpdateReqData(req, rule, mapping.Script, mapping.ScriptedUpsert, rows[i], rows[i+1])
 				r.st.UpdateNum.Add(1)
 			case elastic.ActionDelete:
 				r.st.DeleteNum.Add(1)
@@ -277,7 +284,7 @@ func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values [
 }
 
 func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
-	script string, beforeValues []interface{}, afterValues []interface{}) {
+	script string, scriptedUpsert bool, beforeValues []interface{}, afterValues []interface{}) {
 
 	// beforeValues could be nil, use afterValues instead
 	values := make(map[string]interface{}, len(afterValues))
@@ -324,6 +331,10 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 					"object": values,
 				},
 			},
+		}
+		if scriptedUpsert {
+			req.Data["scripted_upsert"] = true
+			req.Data["upsert"] = map[string]interface{}{}
 		}
 	} else {
 		req.Data = map[string]interface{}{
