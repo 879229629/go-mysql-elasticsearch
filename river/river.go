@@ -85,13 +85,19 @@ func (r *River) newCanal() error {
 func (r *River) prepareCanal() error {
 	var db string
 	dbs := map[string]struct{}{}
-	tables := make([]string, 0, len(r.rules))
-	for _, array := range r.rules {
-		rule := array[0]
-		db = rule.Schema
-		dbs[rule.Schema] = struct{}{}
-		tables = append(tables, rule.Table)
-	}
+
+	// TODO: Considering multiple databases and wildcard tables
+	source := r.c.Sources[0]
+	db = source.Schema
+	dbs[source.Schema] = struct{}{}
+	tables := source.Tables
+	// tables := make([]string, 0, len(r.rules))
+	// for _, array := range r.rules {
+	// 	rule := array[0]
+	// 	db = rule.Schema
+	// 	dbs[rule.Schema] = struct{}{}
+	// 	tables = append(tables, rule.Table)
+	// }
 
 	if len(dbs) == 1 {
 		// one db, we can shrink using table
@@ -106,7 +112,8 @@ func (r *River) prepareCanal() error {
 		r.canal.AddDumpDatabases(keys...)
 	}
 
-	r.canal.RegRowsEventHandler(&rowsEventHandler{r})
+	h := newRowsEventHandler(r)
+	r.canal.RegRowsEventHandler(h)
 
 	return nil
 }

@@ -2,10 +2,11 @@ package river
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
@@ -21,45 +22,109 @@ const (
 )
 
 const (
-	fieldTypeList = "list"
+	fieldTypeList     = "list"
+	defaultCountdown  = time.Millisecond * 20
+	defaultWindowSize = 4000
 )
 
 type rowsEventHandler struct {
-	r *River
+	r          *River
+	countdown  time.Duration
+	windowSize int
+	buffer     []*canal.RowsEvent
+	timer      *time.Timer
+	sync.Mutex
+}
+
+func newRowsEventHandler(r *River) *rowsEventHandler {
+	h := &rowsEventHandler{
+		r:          r,
+		countdown:  defaultCountdown,
+		windowSize: defaultWindowSize,
+	}
+	h.buffer = make([]*canal.RowsEvent, 0, h.windowSize)
+	return h
 }
 
 func (h *rowsEventHandler) Do(e *canal.RowsEvent) error {
-	rules, ok := h.r.rules[ruleKey(e.Table.Schema, e.Table.Name)]
-	if !ok {
+	h.Lock()
+	defer h.Unlock()
+
+	doBulk := false
+	if e == nil {
+		// Trigger by timer
+		doBulk = true
+	} else {
+		h.buffer = append(h.buffer, e)
+		if len(h.buffer) >= h.windowSize {
+			doBulk = true
+		}
+	}
+
+	if !doBulk {
+		if h.timer != nil {
+			h.timer.Reset(h.countdown)
+			return nil
+		}
+		h.timer = time.NewTimer(h.countdown)
+		go func() {
+			if h.timer != nil {
+				<-h.timer.C
+			}
+			h.Do(nil)
+		}()
 		return nil
 	}
 
+	// Clear timer and buffer
+	if h.timer != nil {
+		h.timer.Stop()
+		h.timer = nil
+	}
+	if len(h.buffer) == 0 {
+		return nil
+	}
+	defer func() {
+		h.buffer = h.buffer[:0]
+	}()
+
+	var allReqs []*elastic.BulkRequest
 	var reqs []*elastic.BulkRequest
 	var err error
-	for _, rule := range rules {
-		switch e.Action {
-		case canal.InsertAction:
-			reqs, err = h.r.makeInsertRequest(rule, e.Rows)
-		case canal.DeleteAction:
-			reqs, err = h.r.makeDeleteRequest(rule, e.Rows)
-		case canal.UpdateAction:
-			reqs, err = h.r.makeUpdateRequest(rule, e.Rows)
-		default:
-			return errors.Errorf("invalid rows action %s", e.Action)
-		}
-
-		if err != nil {
-			return errors.Errorf("make %s ES request err %v", e.Action, err)
-		}
-
-		if len(reqs) == 0 {
+	for _, event := range h.buffer {
+		rules, ok := h.r.rules[ruleKey(event.Table.Schema, event.Table.Name)]
+		if !ok {
 			continue
 		}
+		for _, rule := range rules {
+			switch event.Action {
+			case canal.InsertAction:
+				reqs, err = h.r.makeInsertRequest(rule, event.Rows)
+			case canal.DeleteAction:
+				reqs, err = h.r.makeDeleteRequest(rule, event.Rows)
+			case canal.UpdateAction:
+				reqs, err = h.r.makeUpdateRequest(rule, event.Rows)
+			default:
+				log.Errorf("invalid rows action %s", event.Action)
+				continue
+			}
 
-		if err := h.r.doBulk(rule, reqs); err != nil {
-			log.Errorf("do ES bulks err %v, stop", err)
-			return canal.ErrHandleInterrupted
+			if err != nil {
+				log.Errorf("make %s ES request err %v", event.Action, err)
+				continue
+			}
+
+			allReqs = append(allReqs, reqs...)
 		}
+	}
+
+	if len(allReqs) == 0 {
+		return nil
+	}
+
+	if err := h.r.doBulk(allReqs); err != nil {
+		log.Errorf("do ES bulks err %v, stop", err)
+		return canal.ErrHandleInterrupted
 	}
 
 	return nil
@@ -389,7 +454,7 @@ func (r *River) getParentID(rule *Rule, row []interface{}, columnName string) (s
 	return fmt.Sprint(row[index]), nil
 }
 
-func (r *River) doBulk(rule *Rule, reqs []*elastic.BulkRequest) error {
+func (r *River) doBulk(reqs []*elastic.BulkRequest) error {
 	if len(reqs) == 0 {
 		return nil
 	}
@@ -401,18 +466,8 @@ func (r *River) doBulk(rule *Rule, reqs []*elastic.BulkRequest) error {
 		for i := 0; i < len(resp.Items); i++ {
 			for action, item := range resp.Items[i] {
 				if len(item.Error) > 0 {
-					ignoreError := false
-					if rule.IgnoreDocumentMissingError {
-						var msg map[string]string
-						_ = json.Unmarshal(item.Error, &msg)
-						if msg["type"] == "document_missing_exception" {
-							ignoreError = true
-						}
-					}
-					if !ignoreError {
-						log.Errorf("%s index: %s, type: %s, id: %s, status: %d, error: %s",
-							action, item.Index, item.Type, item.ID, item.Status, item.Error)
-					}
+					log.Errorf("%s index: %s, type: %s, id: %s, status: %d, error: %s",
+						action, item.Index, item.Type, item.ID, item.Status, item.Error)
 				}
 			}
 		}

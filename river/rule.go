@@ -18,8 +18,6 @@ type Rule struct {
 
 	IDColumns string `toml:"id_columns"`
 
-	IgnoreDocumentMissingError bool `toml:"ignore_document_missing_error"`
-
 	// Default, a MySQL table field name is mapped to Elasticsearch field name.
 	// Sometimes, you want to use different name, e.g, the MySQL file name is title,
 	// but in Elasticsearch, you want to name it my_title.
