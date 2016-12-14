@@ -3,6 +3,7 @@ package canal
 import (
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
@@ -58,7 +59,7 @@ func (h *dumpParseHandler) Data(db string, table string, values []string) error 
 				return dump.ErrSkip
 			}
 		} else {
-			vs[i] = v[1 : len(v)-1]
+			vs[i] = unescapeSqlString(v[1 : len(v)-1])
 		}
 	}
 
@@ -117,4 +118,34 @@ func (c *Canal) tryDump() error {
 	c.master.Save(true)
 
 	return nil
+}
+
+func unescapeSqlString(s string) string {
+	found := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return s
+	}
+
+	var runeTmp [utf8.UTFMax]byte
+	buf := make([]byte, 0, 3*len(s)/2)
+	for len(s) > 0 {
+		c, multibyte, ss, err := strconv.UnquoteChar(s, '\'')
+		if err != nil {
+			return s
+		}
+		s = ss
+		if c < utf8.RuneSelf || !multibyte {
+			buf = append(buf, byte(c))
+		} else {
+			n := utf8.EncodeRune(runeTmp[:], c)
+			buf = append(buf, runeTmp[:n]...)
+		}
+	}
+	return string(buf)
 }
