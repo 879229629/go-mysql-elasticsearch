@@ -132,19 +132,25 @@ func unescapeSqlString(s string) string {
 		return s
 	}
 
+	origin := s
 	var runeTmp [utf8.UTFMax]byte
 	buf := make([]byte, 0, 3*len(s)/2)
 	for len(s) > 0 {
-		c, multibyte, ss, err := strconv.UnquoteChar(s, '\'')
-		if err != nil {
-			return s
-		}
-		s = ss
-		if c < utf8.RuneSelf || !multibyte {
-			buf = append(buf, byte(c))
+		if s[0] == '\\' && len(s) > 1 && (s[1] == '"' || s[1] == '`') {
+			buf = append(buf, s[1])
+			s = s[2:]
 		} else {
-			n := utf8.EncodeRune(runeTmp[:], c)
-			buf = append(buf, runeTmp[:n]...)
+			c, multibyte, ss, err := strconv.UnquoteChar(s, '\'')
+			if err != nil {
+				return origin
+			}
+			s = ss
+			if c < utf8.RuneSelf || !multibyte {
+				buf = append(buf, byte(c))
+			} else {
+				n := utf8.EncodeRune(runeTmp[:], c)
+				buf = append(buf, runeTmp[:n]...)
+			}
 		}
 	}
 	return string(buf)
