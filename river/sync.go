@@ -211,6 +211,8 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 			continue
 		}
 
+		r.processReplaceColumns(rule, rows[i+1])
+
 		beforeParentID, afterParentID := "", ""
 		if len(rule.Parent) > 0 {
 			if beforeParentID, err = r.getParentID(rule, rows[i], rule.Parent); err != nil {
