@@ -146,6 +146,7 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 		if len(id) == 0 {
 			continue
 		}
+		r.processReplaceColumns(rule, values)
 
 		parentID := ""
 		if len(rule.Parent) > 0 {
@@ -209,6 +210,8 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 		if len(afterID) == 0 {
 			continue
 		}
+
+		r.processReplaceColumns(rule, rows[i+1])
 
 		beforeParentID, afterParentID := "", ""
 		if len(rule.Parent) > 0 {
@@ -474,4 +477,20 @@ func (r *River) doBulk(reqs []*elastic.BulkRequest) error {
 	}
 
 	return nil
+}
+
+func (r *River) processReplaceColumns(rule *Rule, row []interface{}) {
+	for _, column := range strings.Split(rule.ReplaceColumns, ",") {
+		pos := rule.TableInfo.FindColumn(column)
+		if pos < 0 {
+			return
+		}
+		newValue, err := ReplaceJsonFormatToText(row[pos])
+		row[pos] = newValue
+		if err != nil {
+			log.Errorf("replace column %s value error: %v", column, err)
+			return
+		}
+	}
+	return
 }
