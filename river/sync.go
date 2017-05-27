@@ -146,7 +146,6 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 		if len(id) == 0 {
 			continue
 		}
-
 		r.processReplaceColumns(rule, values)
 
 		parentID := ""
@@ -485,11 +484,10 @@ func (r *River) processReplaceColumns(rule *Rule, row []interface{}) {
 			return
 		}
 		newValue, err := ReplaceJsonFormatToText(row[pos])
+		row[pos] = newValue
 		if err != nil {
-			log.Warnf("replace column %s value error: %v", column, err)
+			log.Errorf("replace column %s value error: %v", column, err)
 			return
-		} else if newValue != "" {
-			row[pos] = newValue
 		}
 	}
 	return

@@ -45,6 +45,13 @@ func (c *Content) String() string {
 
 func ReplaceJsonFormatToText(input interface{}) (string, error) {
 	switch value := input.(type) {
+	case []byte:
+		var c Content
+		err := json.Unmarshal(value, &c)
+		if err != nil {
+			return "", err
+		}
+		return c.String(), nil
 	case string:
 		var c Content
 		err := json.Unmarshal([]byte(value), &c)
