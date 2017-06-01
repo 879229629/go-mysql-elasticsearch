@@ -146,7 +146,6 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 		if len(id) == 0 {
 			continue
 		}
-		r.processReplaceColumns(rule, values)
 
 		parentID := ""
 		if len(rule.Parent) > 0 {
@@ -210,8 +209,6 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 		if len(afterID) == 0 {
 			continue
 		}
-
-		r.processReplaceColumns(rule, rows[i+1])
 
 		beforeParentID, afterParentID := "", ""
 		if len(rule.Parent) > 0 {
@@ -329,11 +326,13 @@ func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values [
 
 	for i, c := range rule.TableInfo.Columns {
 		mapped := false
+		value := r.processReplaceColumns(rule, c.Name, values[i])
+
 		for k, v := range rule.FieldMapping {
 			mysql, elastic, fieldType := r.getFieldParts(k, v)
 			if mysql == c.Name {
 				mapped = true
-				v := r.makeReqColumnData(&c, values[i])
+				v := r.makeReqColumnData(&c, value)
 				if fieldType == fieldTypeList {
 					if str, ok := v.(string); ok {
 						req.Data[elastic] = strings.Split(str, ",")
@@ -346,7 +345,7 @@ func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values [
 			}
 		}
 		if mapped == false {
-			req.Data[c.Name] = r.makeReqColumnData(&c, values[i])
+			req.Data[c.Name] = r.makeReqColumnData(&c, value)
 		}
 	}
 }
@@ -363,8 +362,10 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 	partialUpdate := len(beforeValues) > 0 && len(script) == 0
 
 	for i, c := range rule.TableInfo.Columns {
+		afterValue := r.processReplaceColumns(rule, c.Name, afterValues[i])
+
 		mapped := false
-		if partialUpdate && reflect.DeepEqual(beforeValues[i], afterValues[i]) {
+		if partialUpdate && reflect.DeepEqual(beforeValues[i], afterValue) {
 			// nothing changed
 			continue
 		}
@@ -373,7 +374,7 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 			if mysql == c.Name {
 				mapped = true
 				// has custom field mapping
-				v := r.makeReqColumnData(&c, afterValues[i])
+				v := r.makeReqColumnData(&c, afterValue)
 				str, ok := v.(string)
 				if ok == false {
 					values[c.Name] = v
@@ -387,7 +388,7 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 			}
 		}
 		if mapped == false {
-			values[c.Name] = r.makeReqColumnData(&c, afterValues[i])
+			values[c.Name] = r.makeReqColumnData(&c, afterValue)
 		}
 	}
 
@@ -479,18 +480,15 @@ func (r *River) doBulk(reqs []*elastic.BulkRequest) error {
 	return nil
 }
 
-func (r *River) processReplaceColumns(rule *Rule, row []interface{}) {
+func (r *River) processReplaceColumns(rule *Rule, columnName string, value interface{}) interface{} {
 	for _, column := range strings.Split(rule.ReplaceColumns, ",") {
-		pos := rule.TableInfo.FindColumn(column)
-		if pos < 0 {
-			return
-		}
-		newValue, err := ReplaceJsonFormatToText(row[pos])
-		row[pos] = newValue
-		if err != nil {
-			log.Errorf("replace column %s value error: %v", column, err)
-			return
+		if column == columnName {
+			newValue, err := ReplaceJsonFormatToText(value)
+			if err != nil {
+				log.Errorf("replace column %s value error: %v", column, err)
+			}
+			return newValue
 		}
 	}
-	return
+	return value
 }
