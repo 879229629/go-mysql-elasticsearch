@@ -18,6 +18,7 @@ type Rule struct {
 
 	IDColumns      string `toml:"id_columns"`
 	ReplaceColumns string `toml:"replace_columns"`
+	JSONColumns    string `toml:"json_columns"`
 	// Default, a MySQL table field name is mapped to Elasticsearch field name.
 	// Sometimes, you want to use different name, e.g, the MySQL file name is title,
 	// but in Elasticsearch, you want to name it my_title.
@@ -35,6 +36,7 @@ type ActionMapping struct {
 	DBAction       string `toml:"db_action"`
 	ESAction       string `toml:"es_action"`
 	Script         string `toml:"script"`
+	ScriptFile     string `toml:"script_file"`
 	ScriptedUpsert bool   `toml:"scripted_upsert"`
 }
 
