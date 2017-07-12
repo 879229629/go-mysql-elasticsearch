@@ -2,6 +2,7 @@ package river
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -160,15 +161,18 @@ func (r *River) makeRequest(rule *Rule, action string, rows [][]interface{}) ([]
 
 		switch req.Action {
 		case elastic.ActionIndex:
-			r.makeInsertReqData(req, rule, values)
+			err = r.makeInsertReqData(req, rule, values)
 			r.st.InsertNum.Add(1)
 		case elastic.ActionUpdate:
-			r.makeUpdateReqData(req, rule, mapping.Script, mapping.ScriptedUpsert, nil, values)
+			err = r.makeUpdateReqData(req, rule, mapping, nil, values)
 			r.st.UpdateNum.Add(1)
 		case elastic.ActionDelete:
 			r.st.DeleteNum.Add(1)
 		default:
-			return nil, errors.New(fmt.Sprintf("Elastic bulk action '%s' is not supported", req.Action))
+			err = fmt.Errorf("Elastic bulk action '%s' is not supported", req.Action)
+		}
+		if err != nil {
+			return nil, err
 		}
 
 		reqs = append(reqs, req)
@@ -239,7 +243,7 @@ func (r *River) makeUpdateRequest(rule *Rule, rows [][]interface{}) ([]*elastic.
 				r.makeInsertReqData(req, rule, rows[i+1])
 				r.st.InsertNum.Add(1)
 			case elastic.ActionUpdate:
-				r.makeUpdateReqData(req, rule, mapping.Script, mapping.ScriptedUpsert, rows[i], rows[i+1])
+				r.makeUpdateReqData(req, rule, mapping, rows[i], rows[i+1])
 				r.st.UpdateNum.Add(1)
 			case elastic.ActionDelete:
 				r.st.DeleteNum.Add(1)
@@ -320,38 +324,54 @@ func (r *River) getFieldParts(k string, v string) (string, string, string) {
 	return mysql, elastic, fieldType
 }
 
-func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values []interface{}) {
+func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values []interface{}) error {
 	req.Data = make(map[string]interface{}, len(values))
 	req.Action = elastic.ActionIndex
 
+	var jsonColumns []string
+	if len(rule.JSONColumns) > 0 {
+		jsonColumns = strings.Split(rule.JSONColumns, ",")
+	}
+
 	for i, c := range rule.TableInfo.Columns {
 		mapped := false
+		var key string
 		value := r.processReplaceColumns(rule, c.Name, values[i])
 
 		for k, v := range rule.FieldMapping {
 			mysql, elastic, fieldType := r.getFieldParts(k, v)
+
 			if mysql == c.Name {
 				mapped = true
-				v := r.makeReqColumnData(&c, value)
+				key = elastic
+				value = r.makeReqColumnData(&c, value)
 				if fieldType == fieldTypeList {
-					if str, ok := v.(string); ok {
-						req.Data[elastic] = strings.Split(str, ",")
-					} else {
-						req.Data[elastic] = v
+					if str, ok := value.(string); ok {
+						value = strings.Split(str, ",")
 					}
-				} else {
-					req.Data[elastic] = v
 				}
 			}
 		}
-		if mapped == false {
-			req.Data[c.Name] = r.makeReqColumnData(&c, value)
+		if !mapped {
+			key = c.Name
+			value = r.makeReqColumnData(&c, value)
 		}
+		for _, jc := range jsonColumns {
+			if jc == c.Name {
+				if str, ok := value.(string); ok && len(str) > 0 {
+					if err := json.Unmarshal([]byte(str), &value); err != nil {
+						return errors.Trace(err)
+					}
+				}
+			}
+		}
+		req.Data[key] = value
 	}
+	return nil
 }
 
 func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
-	script string, scriptedUpsert bool, beforeValues []interface{}, afterValues []interface{}) {
+	mapping *ActionMapping, beforeValues []interface{}, afterValues []interface{}) error {
 
 	// beforeValues could be nil, use afterValues instead
 	values := make(map[string]interface{}, len(afterValues))
@@ -359,49 +379,68 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 	// maybe dangerous if something wrong delete before?
 	req.Action = elastic.ActionUpdate
 
-	partialUpdate := len(beforeValues) > 0 && len(script) == 0
+	useScript := len(mapping.Script) > 0 || len(mapping.ScriptFile) > 0
+	partialUpdate := len(beforeValues) > 0 && !useScript
+
+	var jsonColumns []string
+	if len(rule.JSONColumns) > 0 {
+		jsonColumns = strings.Split(rule.JSONColumns, ",")
+	}
 
 	for i, c := range rule.TableInfo.Columns {
 		afterValue := r.processReplaceColumns(rule, c.Name, afterValues[i])
-
-		mapped := false
 		if partialUpdate && reflect.DeepEqual(beforeValues[i], afterValue) {
 			// nothing changed
 			continue
 		}
+		mapped := false
+		var key string
+		var value interface{}
 		for k, v := range rule.FieldMapping {
 			mysql, elastic, fieldType := r.getFieldParts(k, v)
 			if mysql == c.Name {
-				mapped = true
 				// has custom field mapping
-				v := r.makeReqColumnData(&c, afterValue)
-				str, ok := v.(string)
-				if ok == false {
-					values[c.Name] = v
-				} else {
-					if fieldType == fieldTypeList {
-						values[elastic] = strings.Split(str, ",")
-					} else {
-						values[elastic] = str
+				mapped = true
+				key = elastic
+				value = r.makeReqColumnData(&c, afterValue)
+				if fieldType == fieldTypeList {
+					if str, ok := value.(string); ok {
+						value = strings.Split(str, ",")
 					}
 				}
 			}
 		}
-		if mapped == false {
-			values[c.Name] = r.makeReqColumnData(&c, afterValue)
+		if !mapped {
+			key = c.Name
+			value = r.makeReqColumnData(&c, afterValue)
 		}
+		for _, jc := range jsonColumns {
+			if jc == c.Name {
+				if str, ok := value.(string); ok && len(str) > 0 {
+					if err := json.Unmarshal([]byte(str), &value); err != nil {
+						return errors.Trace(err)
+					}
+				}
+			}
+		}
+		values[key] = value
 	}
 
-	if len(script) > 0 {
-		req.Data = map[string]interface{}{
-			"script": map[string]interface{}{
-				"inline": script,
-				"params": map[string]interface{}{
-					"object": values,
-				},
+	if useScript {
+		p := map[string]interface{}{
+			"params": map[string]interface{}{
+				"object": values,
 			},
 		}
-		if scriptedUpsert {
+		if len(mapping.Script) > 0 {
+			p["inline"] = mapping.Script
+		} else if len(mapping.ScriptFile) > 0 {
+			p["file"] = mapping.ScriptFile
+		}
+		req.Data = map[string]interface{}{
+			"script": p,
+		}
+		if mapping.ScriptedUpsert {
 			req.Data["scripted_upsert"] = true
 			req.Data["upsert"] = map[string]interface{}{}
 		}
@@ -410,6 +449,7 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 			"doc": values,
 		}
 	}
+	return nil
 }
 
 // Get primary keys in one row and format them into a string
