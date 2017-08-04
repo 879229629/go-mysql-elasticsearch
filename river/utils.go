@@ -3,25 +3,25 @@ package river
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 )
 
 const textKind = "text"
 
 type Node struct {
-	Kind  string `json:"kind"`
-	Type  string `json:"type"`
-	Text  string `json:"text"`
-	Nodes Nodes  `json:"nodes"`
+	Kind   string `json:"kind"`
+	Type   string `json:"type"`
+	Text   string `json:"text"`
+	Nodes  Nodes  `json:"nodes"`
+	Ranges Nodes  `json:"ranges"`
 }
 
 func (node *Node) String() string {
 	var buffer bytes.Buffer
-	if textKind == strings.ToLower(node.Kind) {
+	if node.Text != "" {
 		buffer.WriteString(node.Text)
 	}
-
 	buffer.WriteString(node.Nodes.String())
+	buffer.WriteString(node.Ranges.String())
 	return buffer.String()
 }
 
