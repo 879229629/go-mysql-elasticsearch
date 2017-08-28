@@ -336,7 +336,7 @@ func (r *River) makeInsertReqData(req *elastic.BulkRequest, rule *Rule, values [
 	for i, c := range rule.TableInfo.Columns {
 		mapped := false
 		var key string
-		value := r.processReplaceColumns(rule, c.Name, values[i])
+		value := r.processFilterColumns(rule, c.Name, values[i])
 
 		for k, v := range rule.FieldMapping {
 			mysql, elastic, fieldType := r.getFieldParts(k, v)
@@ -388,7 +388,7 @@ func (r *River) makeUpdateReqData(req *elastic.BulkRequest, rule *Rule,
 	}
 
 	for i, c := range rule.TableInfo.Columns {
-		afterValue := r.processReplaceColumns(rule, c.Name, afterValues[i])
+		afterValue := r.processFilterColumns(rule, c.Name, afterValues[i])
 		if partialUpdate && reflect.DeepEqual(beforeValues[i], afterValue) {
 			// nothing changed
 			continue
@@ -520,10 +520,10 @@ func (r *River) doBulk(reqs []*elastic.BulkRequest) error {
 	return nil
 }
 
-func (r *River) processReplaceColumns(rule *Rule, columnName string, value interface{}) interface{} {
-	for _, column := range strings.Split(rule.ReplaceColumns, ",") {
+func (r *River) processFilterColumns(rule *Rule, columnName string, value interface{}) interface{} {
+	for _, column := range strings.Split(rule.HtmlStripColumns, ",") {
 		if column == columnName {
-			newValue, err := ReplaceJsonFormatToText(value)
+			newValue, err := HtmlStrip(value)
 			if err != nil {
 				log.Errorf("replace column %s value error: %v", column, err)
 			}

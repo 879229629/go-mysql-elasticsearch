@@ -16,9 +16,9 @@ type Rule struct {
 	Type   string `toml:"type"`
 	Parent string `toml:"parent"`
 
-	IDColumns      string `toml:"id_columns"`
-	ReplaceColumns string `toml:"replace_columns"`
-	JSONColumns    string `toml:"json_columns"`
+	IDColumns        string `toml:"id_columns"`
+	HtmlStripColumns string `toml:"html_strip_columns"`
+	JSONColumns      string `toml:"json_columns"`
 	// Default, a MySQL table field name is mapped to Elasticsearch field name.
 	// Sometimes, you want to use different name, e.g, the MySQL file name is title,
 	// but in Elasticsearch, you want to name it my_title.
