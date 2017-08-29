@@ -15,12 +15,6 @@
 			"revisionTime": "2016-12-24T14:14:13Z"
 		},
 		{
-			"checksumSHA1": "wEUtPpFd0RURWpRT9lMoU4FkwX0=",
-			"path": "github.com/pantalo/go-mysql-elasticsearch/elastic",
-			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
-			"revisionTime": "2017-08-28T13:16:47Z"
-		},
-		{
 			"checksumSHA1": "zbmgXbwibsfRrFkU/NY9WcL/tOM=",
 			"path": "github.com/siddontang/go-mysql-elasticsearch/elastic",
 			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
