@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "pPH/BoINXxzYDObljpsGZbysMrw=",
+			"path": "github.com/BurntSushi/toml",
+			"revision": "b26d9c308763d68093482582cea63d69be07a0f0",
+			"revisionTime": "2017-03-28T06:15:53Z"
+		},
+		{
 			"checksumSHA1": "zhNTQfLFjmPY6HMDfEzsCLwp3T4=",
 			"path": "github.com/PuerkitoBio/goquery",
 			"revision": "ce645ea5e67a713599b7415f21f0786451fa9554",
@@ -13,6 +19,25 @@
 			"path": "github.com/andybalholm/cascadia",
 			"revision": "349dd0209470eabd9514242c688c403c0926d266",
 			"revisionTime": "2016-12-24T14:14:13Z"
+		},
+		{
+			"checksumSHA1": "+RcTwqswcjEpErds31bZllnUGgI=",
+			"path": "github.com/juju/errors",
+			"revision": "8234c829496aaeae67c5c71235a2cbcc289e960a",
+			"revisionTime": "2017-05-09T13:42:57Z"
+		},
+		{
+			"checksumSHA1": "94Mvr/SU9I9Zl3pBtbHsBPN0LTg=",
+			"path": "github.com/ngaut/log",
+			"revision": "d2af3a61f64d093457fb23b25d20f4ce3cd551ce",
+			"revisionTime": "2017-03-07T01:10:05Z"
+		},
+		{
+			"checksumSHA1": "jrxZtDVf7w3yFfSge+aVmVGgWfA=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/satori/go.uuid",
+			"path": "github.com/satori/go.uuid",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
 		},
 		{
 			"checksumSHA1": "zbmgXbwibsfRrFkU/NY9WcL/tOM=",
@@ -93,6 +118,13 @@
 			"checksumSHA1": "QfLCOvZ0RTp96/s/0mNGNUzuT1o=",
 			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go/sync2",
 			"path": "github.com/siddontang/go/sync2",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "5ARrN3Zq+E9zazFb/N+b08Serys=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/golang.org/x/net/context",
+			"path": "golang.org/x/net/context",
 			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
 			"revisionTime": "2017-08-28T13:16:47Z"
 		},
