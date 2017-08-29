@@ -1,7 +1,7 @@
 package river
 
 import (
-	"github.com/pantalo/go-mysql-elasticsearch/elastic"
+	"github.com/siddontang/go-mysql-elasticsearch/elastic"
 	"github.com/siddontang/go-mysql/canal"
 	"github.com/siddontang/go-mysql/schema"
 )
