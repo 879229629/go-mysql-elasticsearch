@@ -1,12 +1,118 @@
 {
 	"comment": "",
-	"ignore": "",
+	"ignore": "test",
 	"package": [
 		{
 			"checksumSHA1": "zhNTQfLFjmPY6HMDfEzsCLwp3T4=",
 			"path": "github.com/PuerkitoBio/goquery",
 			"revision": "ce645ea5e67a713599b7415f21f0786451fa9554",
 			"revisionTime": "2017-08-16T13:38:31Z"
+		},
+		{
+			"checksumSHA1": "2rWSos1D+xqNSGkvEMOG3pntod8=",
+			"path": "github.com/andybalholm/cascadia",
+			"revision": "349dd0209470eabd9514242c688c403c0926d266",
+			"revisionTime": "2016-12-24T14:14:13Z"
+		},
+		{
+			"checksumSHA1": "wEUtPpFd0RURWpRT9lMoU4FkwX0=",
+			"path": "github.com/pantalo/go-mysql-elasticsearch/elastic",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "zbmgXbwibsfRrFkU/NY9WcL/tOM=",
+			"path": "github.com/siddontang/go-mysql-elasticsearch/elastic",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "37JXAHr+xEJwRkbX1DZl8XsaSJQ=",
+			"path": "github.com/siddontang/go-mysql-elasticsearch/river",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "sD8T+JkR849klnvoeCn54Fir45E=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go-mysql/canal",
+			"path": "github.com/siddontang/go-mysql/canal",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "k7K1XgcDxQczOrIhHJAhDW4LkwI=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go-mysql/client",
+			"path": "github.com/siddontang/go-mysql/client",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "N8dXKPkFVfhkR9pFcluqX3p5Axk=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go-mysql/dump",
+			"path": "github.com/siddontang/go-mysql/dump",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "7SWfaLfEGm6yV536uN705VMqsBI=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go-mysql/mysql",
+			"path": "github.com/siddontang/go-mysql/mysql",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "n/oG8QPPwsvSAimc/gCSuh5GaOQ=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go-mysql/packet",
+			"path": "github.com/siddontang/go-mysql/packet",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "0v/k1pPZtUicl2oYEm8Gjx6SPk8=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go-mysql/replication",
+			"path": "github.com/siddontang/go-mysql/replication",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "A1Z8awH5OtqLlEyLvzWuKGLox0M=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go-mysql/schema",
+			"path": "github.com/siddontang/go-mysql/schema",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "hou29E6PZ7dEDFgXgM9P15cgHr4=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go/hack",
+			"path": "github.com/siddontang/go/hack",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "pEmPE9Mfq6iydNZ4hi/AIqB81Yk=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go/ioutil2",
+			"path": "github.com/siddontang/go/ioutil2",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "QfLCOvZ0RTp96/s/0mNGNUzuT1o=",
+			"origin": "github.com/siddontang/go-mysql-elasticsearch/vendor/github.com/siddontang/go/sync2",
+			"path": "github.com/siddontang/go/sync2",
+			"revision": "dc3680e566990359f56cf3b4309f27c040942bf4",
+			"revisionTime": "2017-08-28T13:16:47Z"
+		},
+		{
+			"checksumSHA1": "vqc3a+oTUGX8PmD0TS+qQ7gmN8I=",
+			"path": "golang.org/x/net/html",
+			"revision": "3470a06c1357df533e251f14d3a181f67396fe35",
+			"revisionTime": "2017-05-26T16:42:14Z"
+		},
+		{
+			"checksumSHA1": "00eQaGynDYrv3tL+C7l9xH0IDZg=",
+			"path": "golang.org/x/net/html/atom",
+			"revision": "3470a06c1357df533e251f14d3a181f67396fe35",
+			"revisionTime": "2017-05-26T16:42:14Z"
 		}
 	],
 	"rootPath": "github.com/879229629/go-mysql-elasticsearch"
