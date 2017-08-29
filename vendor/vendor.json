@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "",
+	"package": [
+		{
+			"checksumSHA1": "zhNTQfLFjmPY6HMDfEzsCLwp3T4=",
+			"path": "github.com/PuerkitoBio/goquery",
+			"revision": "ce645ea5e67a713599b7415f21f0786451fa9554",
+			"revisionTime": "2017-08-16T13:38:31Z"
+		}
+	],
+	"rootPath": "github.com/879229629/go-mysql-elasticsearch"
+}
