@@ -525,7 +525,7 @@ func (r *River) processFilterColumns(rule *Rule, columnName string, value interf
 		if column == columnName {
 			newValue, err := HtmlStrip(value)
 			if err != nil {
-				log.Errorf("replace column %s value error: %v", column, err)
+				log.Errorf("filter fail, column: %s, error: %v", column, err)
 			}
 			return newValue
 		}
