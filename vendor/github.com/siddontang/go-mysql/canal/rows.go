@@ -1,6 +1,8 @@
 package canal
 
 import (
+	"fmt"
+
 	"github.com/juju/errors"
 	"github.com/siddontang/go-mysql/schema"
 )
@@ -20,6 +22,18 @@ type RowsEvent struct {
 	// Two rows for one event, format is [before update row, after update row]
 	// for update v0, only one row for a event, and we don't support this version.
 	Rows [][]interface{}
+}
+
+func (event *RowsEvent) String() string {
+	s := fmt.Sprintf("table: %s, action: %s, rows: \n", event.Table, event.Action)
+	for _, row := range event.Rows {
+		for _, field := range row {
+			s += fmt.Sprintf("%+v ", field)
+		}
+		s += "\n"
+	}
+	s += "\n"
+	return s
 }
 
 func newRowsEvent(table *schema.Table, action string, rows [][]interface{}) *RowsEvent {

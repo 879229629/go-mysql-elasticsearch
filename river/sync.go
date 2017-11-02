@@ -93,6 +93,7 @@ func (h *rowsEventHandler) Do(e *canal.RowsEvent) error {
 	var reqs []*elastic.BulkRequest
 	var err error
 	for _, event := range h.buffer {
+		log.Errorf("event: %+v \n\n", event)
 		rules, ok := h.r.rules[ruleKey(event.Table.Schema, event.Table.Name)]
 		if !ok {
 			continue
