@@ -24,18 +24,6 @@ type RowsEvent struct {
 	Rows [][]interface{}
 }
 
-func (event *RowsEvent) String() string {
-	s := fmt.Sprintf("table: %s, action: %s, rows: \n", event.Table, event.Action)
-	for _, row := range event.Rows {
-		for _, field := range row {
-			s += fmt.Sprintf("%+v ", field)
-		}
-		s += "\n"
-	}
-	s += "\n"
-	return s
-}
-
 func newRowsEvent(table *schema.Table, action string, rows [][]interface{}) *RowsEvent {
 	e := new(RowsEvent)
 
