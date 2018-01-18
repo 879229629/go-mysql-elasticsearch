@@ -24,7 +24,7 @@ const (
 
 const (
 	fieldTypeList     = "list"
-	defaultCountdown  = time.Second * 1
+	defaultCountdown  = time.Millisecond * 100
 	defaultWindowSize = 4000
 )
 
