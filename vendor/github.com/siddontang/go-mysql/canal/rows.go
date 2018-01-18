@@ -1,8 +1,6 @@
 package canal
 
 import (
-	"fmt"
-
 	"github.com/juju/errors"
 	"github.com/siddontang/go-mysql/schema"
 )
